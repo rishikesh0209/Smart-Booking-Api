@@ -62,22 +62,22 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          PROMPT=$(cat input.txt | sed 's/"/\\"/g')
+          jq -Rs '{
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 800,
+            messages: [
+              {
+                role: "user",
+                content: "You are a senior backend engineer reviewing a pull request. Analyze against spec and diff. Return structured output with acceptance criteria, issues by severity, and summary.\n\n" + .
+              }
+            ]
+          }' input.txt > request.json
 
           curl https://api.anthropic.com/v1/messages \
             -H "x-api-key: $ANTHROPIC_API_KEY" \
             -H "anthropic-version: 2023-06-01" \
             -H "content-type: application/json" \
-            -d "{
-              \"model\": \"claude-3-5-sonnet-20241022\",
-              \"max_tokens\": 800,
-              \"messages\": [
-                {
-                  \"role\": \"user\",
-                  \"content\": \"You are a senior backend engineer reviewing a pull request.\n\nSTRICTLY analyze the implementation against the provided SPEC and PR DIFF.\n\nPerform:\n\n1. Acceptance Criteria Validation\n- Check each AC explicitly (AC-1, AC-2, etc.)\n- Mark as: Implemented / Partial / Missing\n\n2. Edge Case Coverage\n- Identify missing edge case handling\n\n3. Validation & Business Logic Issues\n- Highlight incorrect or missing validations\n\n4. Code Quality\n- Comment on structure and maintainability\n\n5. Severity Classification\nGroup issues:\n- Critical\n- High\n- Medium\n- Low\n\nReturn EXACTLY in this format:\n\n## Acceptance Criteria\n- AC-1: ...\n- AC-2: ...\n\n## Issues by Severity\nCritical:\n- ...\n\nHigh:\n- ...\n\nMedium:\n- ...\n\nLow:\n- ...\n\n## Summary\nShort summary of overall quality and risks.\n\nIMPORTANT:\n- Do NOT return null\n- Do NOT return empty response\n- Be concise and structured\n\n$PROMPT\"
-                }
-              ]
-            }" > response.json
+            -d @request.json > response.json
 
       - name: Extract Claude output
         run: |
