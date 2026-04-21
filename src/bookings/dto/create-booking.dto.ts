@@ -22,5 +22,5 @@ export class CreateBookingDto {
   @ApiProperty({ enum: [30, 60], example: 30 })
   @IsNumber()
   @IsIn([30, 60], { message: 'duration_minutes must be 30 or 60' })
-  duration_minutes: number;
+  duration_minutes: number; // Duration in minutes
 }

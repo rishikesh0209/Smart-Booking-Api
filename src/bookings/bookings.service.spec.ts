@@ -84,4 +84,5 @@ describe('BookingsService', () => {
       }),
     ).toThrow(BadRequestException);
   });
+
 });
