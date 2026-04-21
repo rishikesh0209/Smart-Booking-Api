@@ -52,26 +52,31 @@ jobs:
 
       - name: Prepare input
         run: |
-          echo "SPEC:" > input.txt
-          cat specs/create-booking.md >> input.txt
-          echo "" >> input.txt
-          echo "PR DIFF:" >> input.txt
-          cat pr.diff >> input.txt
+          echo "You are a senior backend engineer reviewing a pull request." > prompt.txt
+          echo "Analyze implementation against spec and PR diff." >> prompt.txt
+          echo "" >> prompt.txt
+          echo "SPEC:" >> prompt.txt
+          cat specs/create-booking.md >> prompt.txt
+          echo "" >> prompt.txt
+          echo "PR DIFF:" >> prompt.txt
+          cat pr.diff >> prompt.txt
 
       - name: Call Claude API
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          jq -Rs '{
-            model: "claude-3-5-sonnet-20241022",
-            max_tokens: 800,
-            messages: [
-              {
-                role: "user",
-                content: "You are a senior backend engineer reviewing a pull request. Analyze against spec and diff. Return structured output with acceptance criteria, issues by severity, and summary.\n\n" + .
-              }
-            ]
-          }' input.txt > request.json
+          jq -n \
+            --rawfile prompt prompt.txt \
+            '{
+              model: "claude-3-5-sonnet-20241022",
+              max_tokens: 800,
+              messages: [
+                {
+                  role: "user",
+                  content: $prompt
+                }
+              ]
+            }' > request.json
 
           curl https://api.anthropic.com/v1/messages \
             -H "x-api-key: $ANTHROPIC_API_KEY" \
