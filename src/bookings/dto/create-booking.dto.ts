@@ -8,11 +8,15 @@ export class CreateBookingDto {
   user_id: string;
 
   @ApiProperty({ enum: ServiceType, example: ServiceType.CONSULTATION })
-  @IsEnum(ServiceType)
+  @IsEnum(ServiceType, {
+    message: 'service_type must be one of: consultation, demo, support',
+  })
   service_type: ServiceType;
 
   @ApiProperty({ example: '2026-04-22', description: 'YYYY-MM-DD' })
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'date must be in YYYY-MM-DD format' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
+    message: 'date must be a valid YYYY-MM-DD string (example: 2026-04-22)',
+  })
   date: string;
 
   @ApiProperty({ example: '10:00', description: 'HH:MM' })
