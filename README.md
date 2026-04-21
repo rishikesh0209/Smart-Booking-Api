@@ -1,10 +1,21 @@
-# Smart Booking API (NestJS Demo)
+# Smart Booking API
+
+This project demonstrates how AI can be integrated into a structured engineering workflow with clear specifications, validation gates, and measurable outcomes.
+
+Instead of just using AI to generate code, this repo shows how to **govern AI usage** through:
+
+- Spec-first development
+- Acceptance criteria enforcement
+- AI-assisted implementation
+- Structured PR reviews
+
+## Demo Scope
 
 Minimal, demo-ready API with one feature:
 
 - `POST /bookings` - Create booking with validation + business rules
 
-Includes:
+Implementation includes:
 
 - NestJS + TypeScript
 - `class-validator` validation
