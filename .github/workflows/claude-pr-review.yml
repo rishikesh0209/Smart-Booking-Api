@@ -14,12 +14,12 @@ jobs:
 
       - name: Get PR diff
         run: |
-          git fetch origin main
-          git diff origin/main...HEAD > pr.diff
+          git fetch origin master
+          git diff origin/master...HEAD > pr.diff
 
       - name: Get commit messages
         run: |
-          git log origin/main..HEAD --pretty=format:"%s" > commits.txt
+          git log origin/master..HEAD --pretty=format:"%s" > commits.txt
 
       - name: Analyze AI usage
         run: |
