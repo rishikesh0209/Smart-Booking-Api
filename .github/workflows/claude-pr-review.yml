@@ -4,14 +4,13 @@ on:
   pull_request:
     types: [opened, synchronize]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   review:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      pull-requests: write
-      issues: write
 
     steps:
       - name: Checkout repo
@@ -19,14 +18,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch base branch
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+
       - name: Get PR diff
         run: |
-          git fetch origin master
-          git diff origin/master...HEAD > pr.diff
+          BASE=${{ github.event.pull_request.base.ref }}
+          git diff origin/$BASE...HEAD > pr.diff
 
       - name: Get commit messages
         run: |
-          git log origin/master..HEAD --pretty=format:"%s" > commits.txt
+          BASE=${{ github.event.pull_request.base.ref }}
+          git log origin/$BASE..HEAD --pretty=format:"%s" > commits.txt
 
       - name: Analyze AI usage
         run: |
@@ -52,33 +56,29 @@ jobs:
 
       - name: Prepare input
         run: |
-          echo "You are a senior backend engineer reviewing a pull request." > prompt.txt
-          echo "Analyze implementation against spec and PR diff." >> prompt.txt
-          echo "" >> prompt.txt
-          echo "SPEC:" >> prompt.txt
-          cat specs/create-booking.md >> prompt.txt
-          echo "" >> prompt.txt
-          echo "PR DIFF:" >> prompt.txt
-          cat pr.diff >> prompt.txt
+          echo "SPEC:" > input.txt
+          cat specs/create-booking.md >> input.txt || echo "No spec file found" >> input.txt
+          echo "" >> input.txt
+          echo "PR DIFF:" >> input.txt
+          cat pr.diff >> input.txt
 
       - name: Call Claude API
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          jq -n \
-            --rawfile prompt prompt.txt \
-            '{
-              model: "claude-3-sonnet-20240229",
-              max_tokens: 800,
-              messages: [
-                {
-                  role: "user",
-                  content: $prompt
-                }
-              ]
-            }' > request.json
+          jq -Rs '{
+            model: "claude-sonnet-4-6",
+            max_tokens: 1200,
+            messages: [
+              {
+                role: "user",
+                content: "You are a senior backend engineer reviewing a pull request.\n\nTasks:\n- Validate against spec\n- Check edge cases\n- Identify bugs\n- Review logic\n- Suggest improvements\n\nReturn STRICT format:\n\n## Summary\n...\n\n## Critical Issues\n...\n\n## High Issues\n...\n\n## Medium Issues\n...\n\n## Low Issues\n...\n\n## Recommendations\n...\n\nINPUT:\n\n" + .
+              }
+            ]
+          }' input.txt > request.json
 
           curl https://api.anthropic.com/v1/messages \
+            -s \
             -H "x-api-key: $ANTHROPIC_API_KEY" \
             -H "anthropic-version: 2023-06-01" \
             -H "content-type: application/json" \
@@ -86,20 +86,22 @@ jobs:
 
       - name: Extract Claude output
         run: |
-          if jq -e '.content[0].text' response.json > /dev/null; then
-            jq -r '.content[0].text' response.json > review.txt
-          else
+          OUTPUT=$(jq -r '.content[0].text // empty' response.json)
+
+          if [ -z "$OUTPUT" ]; then
             echo "Claude review failed or empty response" > review.txt
-            cat response.json >> review.txt
+            jq '.' response.json >> review.txt
+          else
+            echo "$OUTPUT" > review.txt
           fi
 
       - name: Combine output
         run: |
-          echo "Claude AI Review" > final.txt
+          echo "## Claude AI Review" > final.txt
           echo "" >> final.txt
           cat review.txt >> final.txt
           echo "" >> final.txt
-          echo "------------------------" >> final.txt
+          echo "---" >> final.txt
           echo "" >> final.txt
           cat usage.txt >> final.txt
 
@@ -110,7 +112,7 @@ jobs:
             const fs = require('fs');
             const body = fs.readFileSync('final.txt', 'utf8');
 
-            github.rest.issues.createComment({
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
