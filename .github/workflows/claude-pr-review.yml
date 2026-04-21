@@ -1,0 +1,101 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Get PR diff
+        run: |
+          git fetch origin main
+          git diff origin/main...HEAD > pr.diff
+
+      - name: Get commit messages
+        run: |
+          git log origin/main..HEAD --pretty=format:"%s" > commits.txt
+
+      - name: Analyze AI usage
+        run: |
+          TOTAL=$(wc -l < commits.txt)
+          AI_YES=$(grep -c "AI: YES" commits.txt || true)
+          AI_ASSISTED=$(grep -c "AI: ASSISTED" commits.txt || true)
+          AI_NO=$(grep -c "AI: NO" commits.txt || true)
+
+          AI_TOTAL=$((AI_YES + AI_ASSISTED))
+
+          if [ "$TOTAL" -gt 0 ]; then
+            AI_PERCENT=$((AI_TOTAL * 100 / TOTAL))
+          else
+            AI_PERCENT=0
+          fi
+
+          echo "AI Usage Summary" > usage.txt
+          echo "Total Commits: $TOTAL" >> usage.txt
+          echo "AI Generated: $AI_YES" >> usage.txt
+          echo "AI Assisted: $AI_ASSISTED" >> usage.txt
+          echo "Human: $AI_NO" >> usage.txt
+          echo "AI Contribution: $AI_PERCENT%" >> usage.txt
+
+      - name: Prepare input
+        run: |
+          echo "SPEC:" > input.txt
+          cat specs/create-booking.md >> input.txt
+          echo "" >> input.txt
+          echo "PR DIFF:" >> input.txt
+          cat pr.diff >> input.txt
+
+      - name: Call Claude API
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          PROMPT=$(cat input.txt | sed 's/"/\\"/g')
+
+          curl https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "{
+              \"model\": \"claude-3-5-sonnet-20241022\",
+              \"max_tokens\": 800,
+              \"messages\": [
+                {
+                  \"role\": \"user\",
+                  \"content\": \"You are a senior backend PR reviewer. Validate the implementation against the spec. Check acceptance criteria, edge cases, validation, and logic. Provide issues grouped by severity (Critical, High, Medium, Low) and give recommendations.\n\n$PROMPT\"
+                }
+              ]
+            }" > response.json
+
+      - name: Extract Claude output
+        run: |
+          jq -r '.content[0].text' response.json > review.txt
+
+      - name: Combine output
+        run: |
+          echo "Claude AI Review" > final.txt
+          echo "" >> final.txt
+          cat review.txt >> final.txt
+          echo "" >> final.txt
+          echo "------------------------" >> final.txt
+          echo "" >> final.txt
+          cat usage.txt >> final.txt
+
+      - name: Post PR comment
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('final.txt', 'utf8');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
