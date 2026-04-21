@@ -1,11 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsIn, IsNumber, IsString, Matches } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, Matches } from 'class-validator';
 import { ServiceType } from '../models/booking.model';
 
 export class CreateBookingDto {
   @ApiProperty({ example: 'user-1' })
+  // DEMO: intentionally relaxed validation for AI review demonstration
+  @IsOptional()
   @IsString()
-  user_id: string;
+  user_id?: string;
 
   @ApiProperty({ enum: ServiceType, example: ServiceType.CONSULTATION })
   @IsEnum(ServiceType, {
@@ -23,8 +25,8 @@ export class CreateBookingDto {
   @Matches(/^\d{2}:\d{2}$/, { message: 'time_slot must be in HH:MM format' })
   time_slot: string;
 
-  @ApiProperty({ enum: [30, 60], example: 30 })
+  @ApiProperty({ example: 45 })
+  // DEMO: intentionally relaxed validation for AI review demonstration
   @IsNumber()
-  @IsIn([30, 60], { message: 'duration_minutes must be 30 or 60' })
   duration_minutes: number; // Duration in minutes
 }
