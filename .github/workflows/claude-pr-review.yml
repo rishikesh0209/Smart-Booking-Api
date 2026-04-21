@@ -57,7 +57,12 @@ jobs:
       - name: Prepare input
         run: |
           echo "SPEC:" > input.txt
-          cat specs/create-booking.md >> input.txt || echo "No spec file found" >> input.txt
+          if [ -f specs/create-booking.md ]; then
+            cat specs/create-booking.md >> input.txt
+          else
+            echo "No spec file found" >> input.txt
+          fi
+
           echo "" >> input.txt
           echo "PR DIFF:" >> input.txt
           cat pr.diff >> input.txt
@@ -66,16 +71,37 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          jq -Rs '{
-            model: "claude-sonnet-4-6",
-            max_tokens: 1200,
-            messages: [
-              {
-                role: "user",
-                content: "You are a senior backend engineer reviewing a pull request.\n\nTasks:\n- Validate against spec\n- Check edge cases\n- Identify bugs\n- Review logic\n- Suggest improvements\n\nReturn STRICT format:\n\n## Summary\n...\n\n## Critical Issues\n...\n\n## High Issues\n...\n\n## Medium Issues\n...\n\n## Low Issues\n...\n\n## Recommendations\n...\n\nINPUT:\n\n" + .
-              }
-            ]
-          }' input.txt > request.json
+          PROMPT=$(cat input.txt)
+
+          jq -n \
+            --arg prompt "$PROMPT" \
+            '{
+              model: "claude-sonnet-4-6",
+              max_tokens: 1200,
+              messages: [
+                {
+                  role: "user",
+                  content: (
+                    "You are a senior backend engineer reviewing a pull request.\n\n" +
+                    "Tasks:\n" +
+                    "- Validate against spec\n" +
+                    "- Check edge cases\n" +
+                    "- Identify bugs\n" +
+                    "- Review logic\n" +
+                    "- Suggest improvements\n\n" +
+                    "Return STRICT format:\n\n" +
+                    "## Summary\n...\n\n" +
+                    "## Critical Issues\n...\n\n" +
+                    "## High Issues\n...\n\n" +
+                    "## Medium Issues\n...\n\n" +
+                    "## Low Issues\n...\n\n" +
+                    "## Recommendations\n...\n\n" +
+                    "INPUT:\n\n" +
+                    $prompt
+                  )
+                }
+              ]
+            }' > request.json
 
           curl https://api.anthropic.com/v1/messages \
             -s \
