@@ -7,7 +7,12 @@ import {
   HttpStatus,
   Post,
 } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiCreatedResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiConflictResponse,
+  ApiCreatedResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { Booking } from './models/booking.model';
 import { BookingsService } from './bookings.service';
@@ -20,7 +25,8 @@ export class BookingsController {
   @Post('bookings')
   @HttpCode(HttpStatus.CREATED)
   @ApiCreatedResponse({ description: 'Booking created successfully' })
-  @ApiBadRequestResponse({ description: 'Validation or business rule error' })
+  @ApiBadRequestResponse({ description: 'INVALID_REQUEST or INVALID_SERVICE' })
+  @ApiConflictResponse({ description: 'SLOT_UNAVAILABLE — slot already booked' })
   createBooking(@Body() createBookingDto: CreateBookingDto): Booking {
     return this.bookingsService.createBooking(createBookingDto);
   }
@@ -49,23 +55,30 @@ export class BookingsController {
               <p class="text-muted">Create a booking with the form below.</p>
               <form id="bookingForm" class="row g-3">
                 <div class="col-12">
-                  <label for="userId" class="form-label">User ID</label>
-                  <input id="userId" name="userId" type="text" class="form-control" required />
+                  <label for="user_id" class="form-label">User ID</label>
+                  <input id="user_id" name="user_id" type="text" class="form-control" placeholder="user-1" required />
                 </div>
                 <div class="col-12">
-                  <label for="startTime" class="form-label">Start Time</label>
-                  <input id="startTime" name="startTime" type="datetime-local" class="form-control" required />
+                  <label for="service_type" class="form-label">Service Type</label>
+                  <select id="service_type" name="service_type" class="form-select" required>
+                    <option value="consultation">consultation</option>
+                    <option value="demo">demo</option>
+                    <option value="support">support</option>
+                  </select>
                 </div>
                 <div class="col-12">
-                  <label for="endTime" class="form-label">End Time</label>
-                  <input id="endTime" name="endTime" type="datetime-local" class="form-control" required />
+                  <label for="date" class="form-label">Date (YYYY-MM-DD)</label>
+                  <input id="date" name="date" type="date" class="form-control" required />
                 </div>
-                <div class="col-12">
-                  <label for="serviceType" class="form-label">Service Type</label>
-                  <select id="serviceType" name="serviceType" class="form-select" required>
-                    <option value="TENNIS">TENNIS</option>
-                    <option value="CRICKET">CRICKET</option>
-                    <option value="MEETING_ROOM">MEETING_ROOM</option>
+                <div class="col-md-6">
+                  <label for="time_slot" class="form-label">Time Slot (HH:MM)</label>
+                  <input id="time_slot" name="time_slot" type="time" class="form-control" required />
+                </div>
+                <div class="col-md-6">
+                  <label for="duration_minutes" class="form-label">Duration</label>
+                  <select id="duration_minutes" name="duration_minutes" class="form-select" required>
+                    <option value="30">30 minutes</option>
+                    <option value="60">60 minutes</option>
                   </select>
                 </div>
                 <div class="col-12 d-grid">
@@ -89,10 +102,11 @@ export class BookingsController {
 
         const formData = new FormData(form);
         const payload = {
-          userId: formData.get('userId'),
-          startTime: new Date(formData.get('startTime')).toISOString(),
-          endTime: new Date(formData.get('endTime')).toISOString(),
-          serviceType: formData.get('serviceType'),
+          user_id: formData.get('user_id'),
+          service_type: formData.get('service_type'),
+          date: formData.get('date'),
+          time_slot: formData.get('time_slot'),
+          duration_minutes: Number(formData.get('duration_minutes')),
         };
 
         try {

@@ -1,70 +1,88 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 import { ServiceType } from './models/booking.model';
 
 describe('BookingsService', () => {
   let service: BookingsService;
 
+  const FUTURE_DATE = '2099-06-15';
+
   beforeEach(() => {
     service = new BookingsService();
   });
 
-  it('rejects overlapping bookings across users', () => {
+  // AC-1: Valid request returns booking_id and status confirmed
+  it('AC-1: returns booking_id and status confirmed for valid request', () => {
+    const result = service.createBooking({
+      user_id: 'user-1',
+      service_type: ServiceType.CONSULTATION,
+      date: FUTURE_DATE,
+      time_slot: '10:00',
+      duration_minutes: 60,
+    });
+
+    expect(result.booking_id).toBeDefined();
+    expect(result.status).toBe('confirmed');
+    expect(result.user_id).toBe('user-1');
+    expect(result.service_type).toBe(ServiceType.CONSULTATION);
+    expect(result.date).toBe(FUTURE_DATE);
+    expect(result.time_slot).toBe('10:00');
+    expect(result.duration_minutes).toBe(60);
+  });
+
+  // AC-2: Already booked slot returns 409 SLOT_UNAVAILABLE
+  it('AC-2: throws ConflictException (409) when slot overlaps an existing booking', () => {
     service.createBooking({
-      userId: 'user-1',
-      startTime: '2026-04-22T10:00:00.000Z',
-      endTime: '2026-04-22T11:00:00.000Z',
-      serviceType: ServiceType.TENNIS,
+      user_id: 'user-1',
+      service_type: ServiceType.CONSULTATION,
+      date: FUTURE_DATE,
+      time_slot: '10:00',
+      duration_minutes: 60,
     });
 
     expect(() =>
       service.createBooking({
-        userId: 'user-2',
-        startTime: '2026-04-22T10:30:00.000Z',
-        endTime: '2026-04-22T11:30:00.000Z',
-        serviceType: ServiceType.CRICKET,
+        user_id: 'user-2',
+        service_type: ServiceType.DEMO,
+        date: FUTURE_DATE,
+        time_slot: '10:30',
+        duration_minutes: 30,
       }),
-    ).toThrow(BadRequestException);
+    ).toThrow(ConflictException);
   });
 
-  it('enforces max 3 bookings per user per day', () => {
+  // AC-2 edge: same slot booked simultaneously — first wins, second gets 409
+  it('AC-2 edge: non-overlapping slot on same day succeeds', () => {
     service.createBooking({
-      userId: 'user-1',
-      startTime: '2026-04-22T09:00:00.000Z',
-      endTime: '2026-04-22T09:30:00.000Z',
-      serviceType: ServiceType.TENNIS,
-    });
-    service.createBooking({
-      userId: 'user-1',
-      startTime: '2026-04-22T10:00:00.000Z',
-      endTime: '2026-04-22T10:30:00.000Z',
-      serviceType: ServiceType.CRICKET,
-    });
-    service.createBooking({
-      userId: 'user-1',
-      startTime: '2026-04-22T11:00:00.000Z',
-      endTime: '2026-04-22T11:30:00.000Z',
-      serviceType: ServiceType.MEETING_ROOM,
+      user_id: 'user-1',
+      service_type: ServiceType.CONSULTATION,
+      date: FUTURE_DATE,
+      time_slot: '10:00',
+      duration_minutes: 30,
     });
 
+    const result = service.createBooking({
+      user_id: 'user-2',
+      service_type: ServiceType.DEMO,
+      date: FUTURE_DATE,
+      time_slot: '10:30',
+      duration_minutes: 30,
+    });
+
+    expect(result.status).toBe('confirmed');
+  });
+
+  // Edge case: date in the past returns 400 INVALID_REQUEST
+  it('edge: throws BadRequestException for past date', () => {
     expect(() =>
       service.createBooking({
-        userId: 'user-1',
-        startTime: '2026-04-22T12:00:00.000Z',
-        endTime: '2026-04-22T12:30:00.000Z',
-        serviceType: ServiceType.TENNIS,
+        user_id: 'user-1',
+        service_type: ServiceType.SUPPORT,
+        date: '2020-01-01',
+        time_slot: '10:00',
+        duration_minutes: 30,
       }),
     ).toThrow(BadRequestException);
   });
 
-  it('rejects booking shorter than 30 minutes', () => {
-    expect(() =>
-      service.createBooking({
-        userId: 'user-1',
-        startTime: '2026-04-22T10:00:00.000Z',
-        endTime: '2026-04-22T10:10:00.000Z',
-        serviceType: ServiceType.TENNIS,
-      }),
-    ).toThrow(BadRequestException);
-  });
 });

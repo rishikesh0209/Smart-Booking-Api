@@ -1,13 +1,15 @@
 export enum ServiceType {
-  TENNIS = 'TENNIS',
-  CRICKET = 'CRICKET',
-  MEETING_ROOM = 'MEETING_ROOM',
+  CONSULTATION = 'consultation',
+  DEMO = 'demo',
+  SUPPORT = 'support',
 }
 
 export interface Booking {
-  id: string;
-  userId: string;
-  startTime: string;
-  endTime: string;
-  serviceType: ServiceType;
+  booking_id: string;
+  status: 'confirmed';
+  user_id: string;
+  service_type: ServiceType;
+  date: string;
+  time_slot: string;
+  duration_minutes: number;
 }
