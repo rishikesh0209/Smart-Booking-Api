@@ -74,14 +74,19 @@ jobs:
               \"messages\": [
                 {
                   \"role\": \"user\",
-                  \"content\": \"You are a senior backend PR reviewer. Validate the implementation against the spec. Check acceptance criteria, edge cases, validation, and logic. Provide issues grouped by severity (Critical, High, Medium, Low) and give recommendations.\n\n$PROMPT\"
+                  \"content\": \"You are a senior backend engineer reviewing a pull request.\n\nSTRICTLY analyze the implementation against the provided SPEC and PR DIFF.\n\nPerform:\n\n1. Acceptance Criteria Validation\n- Check each AC explicitly (AC-1, AC-2, etc.)\n- Mark as: Implemented / Partial / Missing\n\n2. Edge Case Coverage\n- Identify missing edge case handling\n\n3. Validation & Business Logic Issues\n- Highlight incorrect or missing validations\n\n4. Code Quality\n- Comment on structure and maintainability\n\n5. Severity Classification\nGroup issues:\n- Critical\n- High\n- Medium\n- Low\n\nReturn EXACTLY in this format:\n\n## Acceptance Criteria\n- AC-1: ...\n- AC-2: ...\n\n## Issues by Severity\nCritical:\n- ...\n\nHigh:\n- ...\n\nMedium:\n- ...\n\nLow:\n- ...\n\n## Summary\nShort summary of overall quality and risks.\n\nIMPORTANT:\n- Do NOT return null\n- Do NOT return empty response\n- Be concise and structured\n\n$PROMPT\"
                 }
               ]
             }" > response.json
 
       - name: Extract Claude output
         run: |
-          jq -r '.content[0].text' response.json > review.txt
+          if jq -e '.content[0].text' response.json > /dev/null; then
+            jq -r '.content[0].text' response.json > review.txt
+          else
+            echo "Claude review failed or empty response" > review.txt
+            cat response.json >> review.txt
+          fi
 
       - name: Combine output
         run: |
